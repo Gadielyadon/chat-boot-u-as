@@ -1,0 +1,252 @@
+
+
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Turnos — BotApp Uñas</title>
+  <meta name="description" content="Pide tu turno para uñas fácilmente desde el celular">
+  <meta name="theme-color" content="#FF5A9E">
+  <style>
+    :root{
+      --primary: #FF5A9E; /* default color - editar en la parte superior del archivo */
+      --bg: #f7f7fb;
+      --glass: rgba(255,255,255,0.85);
+      --muted: #7b7b8a;
+      --radius: 14px;
+      --shadow: 0 8px 24px rgba(15,15,30,0.08);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#fff);}
+    .center{max-width:1100px;margin:20px auto;padding:16px}
+
+    /* BUBBLE */
+    .bot-bubble{position:fixed;right:18px;bottom:18px;width:64px;height:64px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;box-shadow:0 6px 20px rgba(0,0,0,0.18);z-index:9999;cursor:pointer}
+
+    /* APP SHELL */
+    .bot-shell{position:fixed;right:18px;bottom:92px;width:360px;height:620px;border-radius:18px;background:var(--glass);backdrop-filter: blur(6px);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;z-index:9999}
+    .bot-header{padding:14px 16px;background:linear-gradient(90deg,var(--primary),#ff3b8e);color:#fff;display:flex;align-items:center;gap:10px}
+    .bot-header .title{font-weight:700;font-size:16px}
+    .bot-header .sub{font-size:12px;opacity:0.95}
+
+    .bot-body{flex:1;display:flex;flex-direction:column;padding:14px;gap:8px;overflow:hidden}
+    .messages{flex:1;overflow:auto;padding-right:6px;display:flex;flex-direction:column;gap:8px}
+
+    /* message bubbles */
+    .msg{max-width:82%;padding:10px 12px;border-radius:12px;font-size:14px;line-height:1.25}
+    .bot-msg{background:#fff;border:1px solid #eee;align-self:flex-start}
+    .user-msg{background:var(--primary);color:#fff;align-self:flex-end}
+
+    .options{display:flex;flex-direction:column;gap:8px}
+    .opt-btn{background:#fff;border:none;padding:10px;border-radius:10px;cursor:pointer;text-align:left;font-weight:600}
+    .opt-btn:active{transform:translateY(1px)}
+
+    .input-row{display:flex;gap:8px;padding-top:8px}
+    .input-row input{flex:1;padding:10px;border-radius:10px;border:1px solid #e7e7ef}
+    .input-row button{padding:10px 12px;border-radius:10px;border:none;background:var(--primary);color:#fff;font-weight:700;cursor:pointer}
+
+    /* small screens full width */
+    @media (max-width:420px){
+      .bot-shell{right:12px;left:12px;bottom:72px;width:auto;height:78vh;border-radius:12px}
+    }
+
+    /* page demo styles */
+    .demo{max-width:980px;margin:40px auto;padding:18px;background:#fff;border-radius:12px;box-shadow:var(--shadow)}
+    .demo h1{margin:0 0 6px}
+    .small{color:var(--muted);font-size:13px}
+
+    .saved-list{margin-top:12px}
+    .saved-item{background:#fff;border-radius:10px;padding:10px;margin-bottom:8px;border:1px solid #f0f0f6}
+  </style>
+</head>
+<body>
+
+<!--
+  CONFIGURACION: editar estos valores para personalizar.
+-->
+<script>
+  const BUSINESS_NAME = "Tu SALON - Uñas"; // Nombre que aparece en el header
+  const WHATSAPP_NUMBER = "5493834755724"; // formato internacional, ej: 5493834755724 (Argentina)
+  const PRIMARY_COLOR = "#FF5A9E"; // color principal del bot
+  const WHATSAPP_PREFIX_MESSAGE = "Hola! Quiero confirmar mi turno para"; // texto inicial en el mensaje de whats
+</script>
+
+<div class="center">
+  <div class="demo">
+    <h1>Demo Bot-App — Turnos Uñas</h1>
+    <p class="small">Este demo funciona como app que se abre desde un link. El código está en un solo archivo para publicar en GitHub Pages o Netlify. Editá las variables arriba para personalizar nombre, color y número de WhatsApp.</p>
+
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button id="openDemo" style="background:var(--primary);color:#fff;padding:8px 10px;border:none;border-radius:10px;cursor:pointer">Abrir Bot-App</button>
+      <button id="copyLink" style="padding:8px 10px;border-radius:10px;border:1px solid #eee;cursor:pointer">Copiar link demo</button>
+    </div>
+
+    <div class="saved-list" id="savedList"></div>
+  </div>
+</div>
+
+<!-- BUBBLE -->
+<div class="bot-bubble" id="botBubble" title="Abrir asistente">💅</div>
+
+<!-- SHELL (hidden initially) -->
+<div class="bot-shell" id="botShell" style="display:none">
+  <div class="bot-header">
+    <div style="flex:1">
+      <div class="title" id="bizName">Turnos Uñas</div>
+      <div class="sub">Pide tu turno rápido</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="minBtn" title="Minimizar" style="background:rgba(255,255,255,0.12);border:none;padding:6px;border-radius:8px;color:#fff;cursor:pointer">—</button>
+    </div>
+  </div>
+
+  <div class="bot-body">
+    <div class="messages" id="messages"></div>
+
+    <div class="options" id="options"></div>
+
+    <div class="input-row" id="inputRow" style="display:none">
+      <input id="textInput" placeholder="Escribí aquí..." />
+      <button id="sendBtn">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Apply primary color from config
+  document.documentElement.style.setProperty('--primary', PRIMARY_COLOR || '#FF5A9E');
+  document.getElementById('bizName').textContent = BUSINESS_NAME || 'Turnos Uñas';
+
+  // Elements
+  const bubble = document.getElementById('botBubble');
+  const shell = document.getElementById('botShell');
+  const messages = document.getElementById('messages');
+  const options = document.getElementById('options');
+  const inputRow = document.getElementById('inputRow');
+  const textInput = document.getElementById('textInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const savedList = document.getElementById('savedList');
+
+  // Simple state
+  let state = { step: 'menu', chosenService: null, day: null, time: null, name: null };
+
+  // Helpers
+  function bot(msg){
+    const d = document.createElement('div'); d.className='msg bot-msg'; d.textContent = msg; messages.appendChild(d); messages.scrollTop = messages.scrollHeight; }
+  function user(msg){
+    const d = document.createElement('div'); d.className='msg user-msg'; d.textContent = msg; messages.appendChild(d); messages.scrollTop = messages.scrollHeight; }
+
+  function clearOptions(){ options.innerHTML=''; }
+
+  // Menu
+  function showMenu(){
+    state.step='menu';
+    clearOptions();
+    bot('Hola! Soy el asistente de turnos. ¿Qué querés hacer?');
+    const opts = [ ['Servicios','services'], ['Pedir turno','book'], ['Precios','prices'], ['Dirección','place'], ['Contacto','contact'] ];
+    opts.forEach(([label,action])=>{
+      const b = document.createElement('button'); b.className='opt-btn'; b.textContent = label; b.onclick = ()=>select(action,label); options.appendChild(b);
+    });
+  }
+
+  function select(action,label){
+    user(label);
+    clearOptions();
+    if(action==='services'){
+      setTimeout(()=>{ bot('✨ Servicios:\n• Semipermanente\n• Esculpidas\n• Decoradas\n• Retoques'); showMenu(); },500);
+    }
+    if(action==='prices'){
+      setTimeout(()=>{ bot('💵 Precios aproximados:\nSemipermanente $4.500 - Esculpidas $6.500 - Decoradas desde $1.000'); showMenu(); },500);
+    }
+    if(action==='place'){
+      setTimeout(()=>{ bot('📍 Estamos en Calle Ejemplo 123, Catamarca'); showMenu(); },500);
+    }
+    if(action==='contact'){
+      setTimeout(()=>{ bot('📞 Podés escribir al WhatsApp: ' + formatWhatsAppLink(true)); showMenu(); },500);
+    }
+    if(action==='book'){
+      setTimeout(()=>startBooking(),400);
+    }
+  }
+
+  // Booking flow
+  function startBooking(){ state.step='booking'; state = { ...state, chosenService:null, day:null, time:null, name:null };
+    bot('Perfecto! Primero, elegí el servicio.');
+    const services = ['Semipermanente','Esculpidas','Soft Gel','Decoradas'];
+    services.forEach(s=>{ const b=document.createElement('button'); b.className='opt-btn'; b.textContent=s; b.onclick=()=>chooseService(s); options.appendChild(b);} );
+  }
+
+  function chooseService(s){ user(s); state.chosenService=s; clearOptions(); bot('Elegiste: '+s + '. Ahora elegí el día.');
+    const days = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    days.forEach(d=>{ const b=document.createElement('button'); b.className='opt-btn'; b.textContent=d; b.onclick=()=>chooseDay(d); options.appendChild(b);} );
+  }
+
+  function chooseDay(d){ user(d); state.day=d; clearOptions(); bot('Perfecto. Elegí un horario.');
+    const times = ['10:00','12:00','14:00','16:00','18:00'];
+    times.forEach(t=>{ const b=document.createElement('button'); b.className='opt-btn'; b.textContent=t; b.onclick=()=>chooseTime(t); options.appendChild(b);} );
+  }
+
+  function chooseTime(t){ user(t); state.time=t; clearOptions(); bot('Casi listo. ¿Cuál es tu nombre?');
+    inputRow.style.display='flex'; textInput.focus();
+  }
+
+  sendBtn.onclick = ()=>{
+    const val = textInput.value.trim(); if(!val) return; user(val); state.name=val; textInput.value=''; inputRow.style.display='none';
+    confirmBooking();
+  }
+
+  function confirmBooking(){ clearOptions(); bot('Resumen:'); bot('\nServicio: ' + state.chosenService + '\nDía: ' + state.day + '\nHora: ' + state.time + '\nNombre: ' + state.name);
+    const a = document.createElement('button'); a.className='opt-btn'; a.textContent='Confirmar y enviar por WhatsApp'; a.onclick=()=>sendWhatsApp(); options.appendChild(a);
+    const b = document.createElement('button'); b.className='opt-btn'; b.textContent='Guardar localmente (demo)'; b.onclick=()=>saveLocal(); options.appendChild(b);
+    const c = document.createElement('button'); c.className='opt-btn'; c.textContent='Volver al menú'; c.onclick=showMenu; options.appendChild(c);
+  }
+
+  function formatWhatsAppLink(asText){
+    const msg = encodeURIComponent(WHATSAPP_PREFIX_MESSAGE + ' ' + state.chosenService + ' el ' + state.day + ' a las ' + state.time + '. Nombre: ' + state.name);
+    const link = 'https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg;
+    return asText? link : link;
+  }
+
+  function sendWhatsApp(){
+    const link = formatWhatsAppLink(true);
+    window.open(link,'_blank');
+    bot('Te voy a redirigir a WhatsApp para terminar la confirmación.');
+    showMenu();
+  }
+
+  function saveLocal(){
+    const saved = JSON.parse(localStorage.getItem('turnos_demo_nails') || '[]');
+    saved.push({service:state.chosenService, day:state.day, time:state.time, name:state.name, created:Date.now()});
+    localStorage.setItem('turnos_demo_nails', JSON.stringify(saved));
+    bot('Turno guardado localmente (solo demo).');
+    renderSaved();
+    showMenu();
+  }
+
+  function renderSaved(){
+    const saved = JSON.parse(localStorage.getItem('turnos_demo_nails') || '[]');
+    savedList.innerHTML = '';
+    if(!saved.length) { savedList.innerHTML = '<div class="small">No hay turnos guardados (demo)</div>'; return; }
+    saved.forEach(s=>{
+      const el = document.createElement('div'); el.className='saved-item'; el.innerHTML = '<strong>'+s.name+'</strong><div class="small">'+s.service+' • '+s.day+' '+s.time+'</div>';
+      savedList.appendChild(el);
+    });
+  }
+
+  // Bubble interactions
+  bubble.onclick = ()=>{ shell.style.display = shell.style.display==='none' ? 'flex' : 'none'; if(shell.style.display==='flex'){ messages.innerHTML=''; showMenu(); } };
+  document.getElementById('minBtn').onclick = ()=>{ shell.style.display='none'; };
+
+  // Demo buttons
+  document.getElementById('openDemo').onclick = ()=>{ window.scrollTo({top:0,behavior:'smooth'}); shell.style.display='flex'; messages.innerHTML=''; showMenu(); };
+  document.getElementById('copyLink').onclick = ()=>{ navigator.clipboard.writeText(location.href).then(()=>{ alert('Link copiado! Pegalo en la bio de Instagram o envialo por WhatsApp.'); }); };
+
+  // Inicial render
+  renderSaved();
+
+</script>
+
+</body>
+</html>
