@@ -1,0 +1,145 @@
+
+<!--
+  Archivo: Panel-Admin-Uñas.html
+  Descripción: Panel Admin para manejar turnos y precios de Bot-App Uñas.
+  Funciona con Firebase Firestore. Instrucciones: crear proyecto Firebase y reemplazar la config abajo.
+  Incluye: 
+   - Tabla de turnos editable
+   - Modificar precios y servicios
+   - Panel responsive
+-->
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Admin - Bot Uñas</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+  body{font-family: Arial,sans-serif;margin:0;background:#f7f7fb;color:#333;}
+  header{background:#FF5A9E;color:#fff;padding:16px;text-align:center;font-size:18px;}
+  main{max-width:980px;margin:20px auto;padding:16px;background:#fff;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,0.08);}
+  h2{margin-top:0;}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+  th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+  th{background:#FF5A9E;color:#fff;}
+  input[type=text], input[type=number]{width:100%;padding:6px;box-sizing:border-box;}
+  button{background:#FF5A9E;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;margin:2px;}
+  button.delete{background:#e74c3c;}
+  button.save{background:#27ae60;}
+  .flex-row{display:flex;gap:10px;flex-wrap:wrap;}
+</style>
+</head>
+<body>
+<header>Panel Admin - Bot Uñas</header>
+<main>
+<h2>Turnos</h2>
+<table id="turnosTable">
+  <thead>
+    <tr><th>Nombre</th><th>Servicio</th><th>Día</th><th>Hora</th><th>Estado</th><th>Acciones</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h2>Servicios y Precios</h2>
+<div id="serviciosDiv" class="flex-row"></div>
+<button id="addServiceBtn">Agregar servicio</button>
+</main>
+<script>
+// TODO: reemplazar por tu config de Firebase
+const firebaseConfig = {
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_AUTH_DOMAIN",
+  projectId: "TU_PROJECT_ID",
+  storageBucket: "TU_STORAGE_BUCKET",
+  messagingSenderId: "TU_MESSAGING_SENDER_ID",
+  appId: "TU_APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const turnosTableBody = document.querySelector('#turnosTable tbody');
+const serviciosDiv = document.getElementById('serviciosDiv');
+const addServiceBtn = document.getElementById('addServiceBtn');
+
+// Cargar turnos desde Firestore
+function loadTurnos(){
+  turnosTableBody.innerHTML='';
+  db.collection('turnos').orderBy('dia').get().then(snapshot=>{
+    snapshot.forEach(doc=>{
+      const t=doc.data();
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td contenteditable='true' data-field='nombre'>${t.nombre}</td>
+        <td contenteditable='true' data-field='servicio'>${t.servicio}</td>
+        <td contenteditable='true' data-field='dia'>${t.dia}</td>
+        <td contenteditable='true' data-field='hora'>${t.hora}</td>
+        <td contenteditable='true' data-field='estado'>${t.estado}</td>
+        <td>
+          <button class='save'>Guardar</button>
+          <button class='delete'>Eliminar</button>
+        </td>
+      `;
+      // Guardar cambios
+      tr.querySelector('.save').onclick=()=>{
+        const updated = {};
+        tr.querySelectorAll('td[contenteditable]').forEach(td=>{updated[td.dataset.field]=td.textContent});
+        db.collection('turnos').doc(doc.id).set(updated).then(()=>alert('Turno actualizado'));
+      };
+      // Eliminar turno
+      tr.querySelector('.delete').onclick=()=>{
+        if(confirm('Eliminar este turno?')) db.collection('turnos').doc(doc.id).delete().then(()=>alert('Turno eliminado'));
+      };
+      turnosTableBody.appendChild(tr);
+    });
+  });
+}
+
+// Cargar servicios y precios
+function loadServicios(){
+  serviciosDiv.innerHTML='';
+  db.collection('config').doc('servicios').get().then(doc=>{
+    const data = doc.exists ? doc.data() : {items:[]};
+    data.items.forEach((s,i)=>{
+      const div=document.createElement('div');
+      div.innerHTML=`<input type='text' value='${s.nombre}' data-index='${i}' class='nombre'><input type='number' value='${s.precio}' data-index='${i}' class='precio'><button class='save'>Guardar</button><button class='delete'>Eliminar</button>`;
+      // Guardar servicio
+      div.querySelector('.save').onclick=()=>{
+        const nombre=div.querySelector('.nombre').value;
+        const precio=parseInt(div.querySelector('.precio').value);
+        data.items[i]={nombre,precio};
+        db.collection('config').doc('servicios').set({items:data.items}).then(()=>alert('Servicio actualizado'));
+      };
+      // Eliminar servicio
+      div.querySelector('.delete').onclick=()=>{
+        if(confirm('Eliminar este servicio?')){
+          data.items.splice(i,1);
+          db.collection('config').doc('servicios').set({items:data.items}).then(()=>alert('Servicio eliminado')); 
+        }
+      };
+      serviciosDiv.appendChild(div);
+    });
+  });
+}
+
+// Agregar servicio nuevo
+addServiceBtn.onclick=()=>{
+  const nombre=prompt('Nombre del servicio');
+  const precio=parseInt(prompt('Precio')); 
+  if(!nombre || isNaN(precio)) return;
+  db.collection('config').doc('servicios').get().then(doc=>{
+    const data=doc.exists ? doc.data() : {items:[]};
+    data.items.push({nombre,precio});
+    db.collection('config').doc('servicios').set({items:data.items}).then(()=>loadServicios());
+  });
+}
+
+// Inicial
+loadTurnos();
+loadServicios();
+</script>
+</body>
+</html>
