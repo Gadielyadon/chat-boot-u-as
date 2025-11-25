@@ -247,6 +247,37 @@
   renderSaved();
 
 </script>
+<!-- Firebase App (core) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+  // Configuración de Firebase
+  const firebaseConfig = {
+    apiKey: "TU_APIKEY",
+    authDomain: "boot-2e478.firebaseapp.com",
+    projectId: "boot-2e478",
+    storageBucket: "boot-2e478.appspot.com",
+    messagingSenderId: "TU_MESSAGING_SENDER_ID",
+    appId: "TU_APP_ID"
+  };
+
+  // Inicializar Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // Leer servicios desde Firestore
+  db.collection("servicios").get().then((querySnapshot) => {
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      // Aquí agregás al HTML, por ejemplo a un div con id="servicios"
+      const div = document.getElementById("servicios");
+      const item = document.createElement("div");
+      item.textContent = `${data.nombre} - $${data.precio}`;
+      div.appendChild(item);
+    });
+  });
+</script>
 
 </body>
 </html>
